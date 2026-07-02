@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista com Filtro e Detalhes</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f7;
+      color: #333;
+      margin: 0;
+    }
+    h2 {
+      color: #007aff;
+      margin-bottom: 15px;
+    }
+    
+    /* Estilo do Campo de Filtro */
+    .busca-container {
+      margin-bottom: 20px;
+    }
+    .busca-input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .busca-input:focus {
+      border-color: #007aff;
+    }
+
+    .loading {
+      color: #999;
+      font-style: italic;
+    }
+
+    /* Estilo da Lista e Itens Clicáveis */
+    .lista-itens {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .item {
+      background: white;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border-left: 5px solid #007aff;
+      cursor: pointer;
+      transition: transform 0.1s, background-color 0.2s;
+      -webkit-tap-highlight-color: transparent; /* Remove o flash azul do clique no mobile */
+    }
+    .item:active {
+      transform: scale(0.98);
+      background-color: #f0f0f0;
+    }
+    .item-titulo {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 5px;
+    }
+
+    /* Estilo do Modal de Detalhes (Pop-up) */
+    .modal {
+      display: none; /* Escondido por padrão */
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-conteudo {
+      background-color: white;
+      padding: 25px;
+      border-radius: 12px;
+      width: 85%;
+      max-width: 400px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      animation: abrirModal 0.2s ease-out;
+    }
+    @keyframes abrirModal {
+      from { transform: scale(0.9); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-titulo {
+      font-size: 20px;
+      font-weight: bold;
+      color: #007aff;
+      margin-bottom: 15px;
+    }
+    .modal-corpo {
+      font-size: 16px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      color: #444;
+    }
+    .btn-fechar {
+      width: 100%;
+      padding: 12px;
+      background-color: #007aff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Minha Lista do Excel</h2>
+  
+  <div class="busca-container">
+    <input type="text" id="input-busca" class="busca-input" placeholder="Digite para filtrar..." oninput="filtrarLista()">
+  </div>
+  
+  <p id="status" class="loading">Carregando dados nativos...</p>
+
+  <ul id="lista" class="lista-itens"></ul>
+
+  <div id="modal-detalhes" class="modal">
+    <div class="modal-conteudo">
+      <div id="modal-titulo" class="modal-titulo">Título do Item</div>
+      <div id="modal-corpo" class="modal-corpo">Detalhes aqui...</div>
+      <button class="btn-fechar" onclick="fecharModal()">Fechar</button>
+    </div>
+  </div>
+
+  <script>
+    let todosOsDados = []; // Guarda a lista completa vinda do Excel
+
+    // 1. Recebe os dados do React Native
+    window.receberDadosExcel = function(dadosJson) {
+      const statusTxt = document.getElementById('status');
+      if (statusTxt) statusTxt.style.display = 'none';
+
+      todosOsDados = dadosJson; // Salva globalmente
+      renderizarLista(todosOsDados); // Renderiza a lista inicial completa
+    };
+
+    // 2. Renderiza os itens na tela
+    function renderizarLista(itens) {
+      const listaUl = document.getElementById('lista');
+      listaUl.innerHTML = ''; 
+
+      if (!itens || itens.length === 0) {
+        listaUl.innerHTML = '<li style="list-style:none; color:#999;">Nenhum item encontrado.</li>';
+        return;
+      }
+
+      itens.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'item';
+        
+        // Pega a primeira coluna para usar como título principal
+        const chaves = Object.keys(item);
+        const titulo = item[chaves[0]] || 'Sem nome';
+
+        li.innerHTML = `<div class="item-titulo">${titulo}</div>`;
+        
+        // Configura o clique para abrir o modal passando o índice do item filtrado
+        li.onclick = () => abrirModal(item);
+        
+        listaUl.appendChild(li);
+      });
+    }
+
+    // 3. Função de Filtro Dinâmico
+    function filtrarLista() {
+      const termoBusca = document.getElementById('input-busca').value.toLowerCase();
+      
+      // Filtra os dados se QUALQUER coluna do Excel tiver o termo digitado
+      const dadosFiltrados = todosOsDados.filter(item => {
+        return Object.values(item).some(valor => 
+          String(valor).toLowerCase().includes(termoBusca)
+        );
+      });
+
+      renderizarLista(dadosFiltrados);
+    }
+
+    // 4. Controle do Modal (Detalhes)
+    function abrirModal(item) {
+      const modal = document.getElementById('modal-detalhes');
+      const modalTitulo = document.getElementById('modal-titulo');
+      const modalCorpo = document.getElementById('modal-corpo');
+
+      const chaves = Object.keys(item);
+      modalTitulo.innerText = item[chaves[0]] || 'Detalhes';
+
+      // Monta o corpo do modal mostrando TODAS as colunas que existirem na linha do Excel
+      let htmlDetalhes = '';
+      chaves.forEach(chave => {
+        htmlDetalhes += `<p><strong>${chave}:</strong> ${item[chave]}</p>`;
+      });
+
+      modalCorpo.innerHTML = htmlDetalhes;
+      modal.style.display = 'flex'; // Exibe o modal centralizado
+    }
+
+    function fecharModal() {
+      document.getElementById('modal-detalhes').style.display = 'none';
+    }
+    
+    // Fecha o modal se o usuário clicar fora da caixinha branca
+    window.onclick = function(event) {
+      const modal = document.getElementById('modal-detalhes');
+      if (event.target === modal) {
+        fecharModal();
+      }
+    }
+  </script>
+</body>
+</html>
